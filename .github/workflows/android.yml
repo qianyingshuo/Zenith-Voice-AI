@@ -20,16 +20,16 @@ jobs:
       with:
         java-version: '21'
         distribution: 'temurin'
-        cache: gradle
 
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
       with:
-        gradle-version: 8.7
+        gradle-version: 9.3.1
 
     - name: Decode Debug Keystore
       run: |
         base64 -d debug.keystore.base64 > debug.keystore 2>/dev/null || echo "No debug.keystore.base64 or failed to decode at root"
+        mkdir -p app
         base64 -d debug.keystore.base64 > app/debug.keystore 2>/dev/null || echo "No debug.keystore.base64 or failed to decode in app folder"
 
     - name: Generate .env File
@@ -37,7 +37,7 @@ jobs:
         cp .env.example .env 2>/dev/null || touch .env
 
     - name: Generate Gradle Wrapper
-      run: gradle wrapper --gradle-version 8.7
+      run: gradle wrapper --gradle-version 9.3.1
 
     - name: Grant Execute Permission to Gradlew
       run: chmod +x gradlew
