@@ -1,0 +1,6 @@
+{
+  "name": "GeminiTTS Bridge",
+  "description": "OriginOS 6 high refresh-rate adapted Gemini sniffer and Azure/Gemini text-to-speech audio backup system with automated Google Drive sync and version controls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
