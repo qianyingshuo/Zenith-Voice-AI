@@ -215,7 +215,16 @@ class GeminiTextSnifferService : AccessibilityService() {
             putExtra(TtsPlaybackService.EXTRA_SPEECH_TEXT, text)
             putExtra(TtsPlaybackService.EXTRA_IS_USER, isUser)
         }
-        startForegroundService(playIntent)
+        try {
+            startForegroundService(playIntent)
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "Failed starting TtsPlaybackService via startForegroundService, trying startService", e)
+            try {
+                startService(playIntent)
+            } catch (e2: Exception) {
+                AppLogger.e(TAG, "All service activation intents failed", e2)
+            }
+        }
     }
 
     private fun calculateMd5(input: String): String {

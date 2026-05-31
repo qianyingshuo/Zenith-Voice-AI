@@ -61,15 +61,19 @@ class TtsPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener {
 
         setupLocks()
         setupNotificationChannel()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                NOTIFICATION_ID,
-                buildOngoingNotification("无障碍语音桥接器已启动，等待接收聊天内容"),
-                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
-            )
-        } else {
-            @Suppress("DEPRECATION")
-            startForeground(NOTIFICATION_ID, buildOngoingNotification("无障碍语音桥接器已启动，等待接收聊天内容"))
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    buildOngoingNotification("无障碍语音桥接器已启动，等待接收聊天内容"),
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                startForeground(NOTIFICATION_ID, buildOngoingNotification("无障碍语音桥接器已启动，等待接收聊天内容"))
+            }
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "Failed to start foreground natively, running in fallback background mode", e)
         }
     }
 

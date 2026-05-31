@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">GeminiTTS Bridge</string>
+    <string name="accessibility_service_description">Gemini 智能捕获与高保真语音播报助手。能够在后台实时嗅探 Gemini 的回答，并采用神经网络声线进行高自然度朗读。</string>
+</resources>

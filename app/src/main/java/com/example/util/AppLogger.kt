@@ -101,7 +101,7 @@ object AppLogger {
                     writer.write("-----------------------------\n")
                 }
             }
-        } catch (e: IOException) {
+        } catch (e: Exception) {
             Log.e(TAG, "Failed writing logs to local storage file", e)
         }
     }

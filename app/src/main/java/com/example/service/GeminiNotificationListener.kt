@@ -49,7 +49,16 @@ class GeminiNotificationListener : NotificationListenerService() {
                 putExtra(TtsPlaybackService.EXTRA_SPEECH_TEXT, rawText)
                 putExtra(TtsPlaybackService.EXTRA_IS_USER, false)
             }
-            startForegroundService(playIntent)
+            try {
+                startForegroundService(playIntent)
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "Failed starting TtsPlaybackService via startForegroundService, trying startService", e)
+                try {
+                    startService(playIntent)
+                } catch (e2: Exception) {
+                    AppLogger.e(TAG, "All service activation intents failed", e2)
+                }
+            }
         }
     }
 }

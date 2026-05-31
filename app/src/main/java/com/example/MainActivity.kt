@@ -501,7 +501,16 @@ fun SnifferControlPanel(viewModel: MainViewModel) {
                                 putExtra(TtsPlaybackService.EXTRA_SPEECH_TEXT, "这是一条由 Gemini 语音播报系统成功捕获的范例演示，代表系统集成成功。")
                                 putExtra(TtsPlaybackService.EXTRA_IS_USER, false)
                             }
-                            context.startForegroundService(triggerIntent)
+                            try {
+                                context.startForegroundService(triggerIntent)
+                            } catch (e: Exception) {
+                                AppLogger.e("MainActivity", "Failed context.startForegroundService, trying startService", e)
+                                try {
+                                    context.startService(triggerIntent)
+                                } catch (e2: Exception) {
+                                    AppLogger.e("MainActivity", "All service start intents failed", e2)
+                                }
+                            }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = ThemeColors.SurfaceCard),
                         shape = RoundedCornerShape(20.dp)
@@ -655,7 +664,16 @@ fun ChatMessageCard(msg: ChatMessage) {
                                 putExtra(TtsPlaybackService.EXTRA_SPEECH_TEXT, msg.text)
                                 putExtra(TtsPlaybackService.EXTRA_IS_USER, false)
                             }
-                            context.startForegroundService(playerIntent)
+                            try {
+                                context.startForegroundService(playerIntent)
+                            } catch (e: Exception) {
+                                AppLogger.e("MainActivity", "Failed context.startForegroundService for player, trying startService", e)
+                                try {
+                                    context.startService(playerIntent)
+                                } catch (e2: Exception) {
+                                    AppLogger.e("MainActivity", "All service start intents failed for player", e2)
+                                }
+                            }
                         }
                         .padding(horizontal = 10.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
