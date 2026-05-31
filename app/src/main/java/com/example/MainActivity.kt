@@ -502,14 +502,9 @@ fun SnifferControlPanel(viewModel: MainViewModel) {
                                 putExtra(TtsPlaybackService.EXTRA_IS_USER, false)
                             }
                             try {
-                                context.startForegroundService(triggerIntent)
+                                context.startService(triggerIntent)
                             } catch (e: Exception) {
-                                AppLogger.e("MainActivity", "Failed context.startForegroundService, trying startService", e)
-                                try {
-                                    context.startService(triggerIntent)
-                                } catch (e2: Exception) {
-                                    AppLogger.e("MainActivity", "All service start intents failed", e2)
-                                }
+                                AppLogger.e("MainActivity", "Failed context.startService", e)
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = ThemeColors.SurfaceCard),
@@ -665,14 +660,9 @@ fun ChatMessageCard(msg: ChatMessage) {
                                 putExtra(TtsPlaybackService.EXTRA_IS_USER, false)
                             }
                             try {
-                                context.startForegroundService(playerIntent)
+                                context.startService(playerIntent)
                             } catch (e: Exception) {
-                                AppLogger.e("MainActivity", "Failed context.startForegroundService for player, trying startService", e)
-                                try {
-                                    context.startService(playerIntent)
-                                } catch (e2: Exception) {
-                                    AppLogger.e("MainActivity", "All service start intents failed for player", e2)
-                                }
+                                AppLogger.e("MainActivity", "Failed context.startService for player", e)
                             }
                         }
                         .padding(horizontal = 10.dp, vertical = 6.dp),
@@ -1134,26 +1124,14 @@ fun SystemDebugLogsPanel(viewModel: MainViewModel) {
     var activeSubTab by remember { mutableStateOf(0) } // 0: 日志控制, 1: 仿真沙盘
     
     // System Local Offline TTS engine helper for Phase 3 sound confirmation
-    val systemTts = remember { mutableStateOf<android.speech.tts.TextToSpeech?>(null) }
+    var systemTts by remember { mutableStateOf<android.speech.tts.TextToSpeech?>(null) }
     
-    DisposableEffect(Unit) {
-        var tts: android.speech.tts.TextToSpeech? = null
-        try {
-            tts = android.speech.tts.TextToSpeech(context) { status ->
-                if (status == android.speech.tts.TextToSpeech.SUCCESS) {
-                    AppLogger.i("DiagnosticsSandbox", "System standard offline TTS engine loaded successfully.")
-                } else {
-                    AppLogger.w("DiagnosticsSandbox", "System standard offline TTS engine failed to initialize: $status")
-                }
-            }
-            systemTts.value = tts
-        } catch (e: Exception) {
-            AppLogger.e("DiagnosticsSandbox", "Failed to construct TextToSpeech engine", e)
-        }
+    DisposableEffect(systemTts) {
+        val ttsInstance = systemTts
         onDispose {
             try {
-                tts?.stop()
-                tts?.shutdown()
+                ttsInstance?.stop()
+                ttsInstance?.shutdown()
             } catch (e: Exception) {
                 // Ignore exception on stop/shutdown
             }
@@ -1596,14 +1574,31 @@ fun SystemDebugLogsPanel(viewModel: MainViewModel) {
                         Button(
                             onClick = {
                                 AppLogger.i("TtsPlaybackService", "【仿真播音】调起本机系统极速离线朗读测试...")
-                                if (systemTts.value != null) {
+                                if (systemTts == null) {
+                                    try {
+                                        val newTts = android.speech.tts.TextToSpeech(context) { status ->
+                                            if (status == android.speech.tts.TextToSpeech.SUCCESS) {
+                                                AppLogger.i("DiagnosticsSandbox", "System standard offline TTS engine loaded successfully on demand.")
+                                                val ttsText = "无障碍语音桥接器提示您：本地双声道播音系统及喇叭呼叫确认成功！扬声器工作正常。"
+                                                systemTts?.speak(ttsText, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "diag")
+                                                AppLogger.d("TtsPlaybackService", "【仿真播音】喇叭呼叫指令已递交底层：'$ttsText'")
+                                                logs = AppLogger.readLogs(120)
+                                            } else {
+                                                AppLogger.w("DiagnosticsSandbox", "System standard offline TTS engine failed to initialize: $status")
+                                            }
+                                        }
+                                        systemTts = newTts
+                                        Toast.makeText(context, "正在初始化离线朗读引擎，请稍候...", Toast.LENGTH_SHORT).show()
+                                    } catch (e: Exception) {
+                                        AppLogger.e("DiagnosticsSandbox", "Failed to construct TextToSpeech engine dynamically", e)
+                                        Toast.makeText(context, "无法启动本机离线朗读引擎: ${e.message}", Toast.LENGTH_LONG).show()
+                                    }
+                                } else {
                                     val ttsText = "无障碍语音桥接器提示您：本地双声道播音系统及喇叭呼叫确认成功！扬声器工作正常。"
-                                    systemTts.value?.speak(ttsText, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "diag")
+                                    systemTts?.speak(ttsText, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "diag")
                                     AppLogger.d("TtsPlaybackService", "【仿真播音】喇叭呼叫指令已递交底层：'$ttsText'")
                                     logs = AppLogger.readLogs(120)
                                     Toast.makeText(context, "正在进行本地离线朗读...", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    Toast.makeText(context, "本地引擎尚未就绪，请再点击一次！", Toast.LENGTH_SHORT).show()
                                 }
                             },
                             modifier = Modifier.weight(1.0f),

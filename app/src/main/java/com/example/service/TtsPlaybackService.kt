@@ -32,6 +32,7 @@ class TtsPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener {
         const val ACTION_STOP_SPEECH = "com.example.service.ACTION_STOP_SPEECH"
         const val EXTRA_SPEECH_TEXT = "com.example.service.EXTRA_SPEECH_TEXT"
         const val EXTRA_IS_USER = "com.example.service.EXTRA_IS_USER"
+        const val EXTRA_START_AS_FOREGROUND = "com.example.service.EXTRA_START_AS_FOREGROUND"
 
         private const val NOTIFICATION_CHANNEL_ID = "TtsPlaybackServiceChannel"
         private const val NOTIFICATION_ID = 2026
@@ -61,20 +62,6 @@ class TtsPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener {
 
         setupLocks()
         setupNotificationChannel()
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(
-                    NOTIFICATION_ID,
-                    buildOngoingNotification("无障碍语音桥接器已启动，等待接收聊天内容"),
-                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
-                )
-            } else {
-                @Suppress("DEPRECATION")
-                startForeground(NOTIFICATION_ID, buildOngoingNotification("无障碍语音桥接器已启动，等待接收聊天内容"))
-            }
-        } catch (e: Exception) {
-            AppLogger.e(TAG, "Failed to start foreground natively, running in fallback background mode", e)
-        }
     }
 
     private fun setupLocks() {
@@ -95,6 +82,24 @@ class TtsPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action
+        val startAsForeground = intent?.getBooleanExtra(EXTRA_START_AS_FOREGROUND, false) == true
+        if (startAsForeground) {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(
+                        NOTIFICATION_ID,
+                        buildOngoingNotification("无障碍语音桥接器已启动，等待接收聊天内容"),
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    startForeground(NOTIFICATION_ID, buildOngoingNotification("无障碍语音桥接器已启动，等待接收聊天内容"))
+                }
+            } catch (e: Exception) {
+                AppLogger.e(TAG, "Failed to start foreground natively inside startCommand", e)
+            }
+        }
+
         if (action == ACTION_PLAY_SPEECH) {
             val text = intent.getStringExtra(EXTRA_SPEECH_TEXT) ?: ""
             val isUser = intent.getBooleanExtra(EXTRA_IS_USER, false)
