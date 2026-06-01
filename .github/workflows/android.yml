@@ -27,6 +27,9 @@ jobs:
         gradle-version: 9.3.1
         validate-wrappers: false
 
+    - name: Regenerate Gradle Wrapper to fix Git corruption
+      run: gradle wrapper --gradle-version 9.3.1
+
     - name: Decode Debug Keystore
       run: |
         if [ -f debug.keystore.base64 ]; then
