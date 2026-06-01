@@ -1182,19 +1182,66 @@ fun SystemDebugLogsPanel(viewModel: MainViewModel) {
                 )
             }
             
-            // Refresh Button
-            IconButton(
-                onClick = { 
-                    logs = AppLogger.readLogs(120) 
-                    Toast.makeText(context, "日志流已刷新", Toast.LENGTH_SHORT).show()
-                },
-                modifier = Modifier.size(24.dp)
+            // Restart Services Button (formerly Refresh Button)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(ThemeColors.OceanicTeal.copy(alpha = 0.15f))
+                    .clickable {
+                        AppLogger.i("MainActivity", "=============================== 手动重启服务 ===============================")
+                        AppLogger.i("MainActivity", "【服务重启指令】用户触发了控制台诊断重启。")
+                        AppLogger.i("MainActivity", "【服务重启指令】步骤 1/3：停止并重启音频语音引擎 (TtsPlaybackService)...")
+                        try {
+                            val startIntent = Intent(context, TtsPlaybackService::class.java).apply {
+                                action = TtsPlaybackService.ACTION_STOP_SPEECH
+                            }
+                            androidx.core.content.ContextCompat.startForegroundService(context, startIntent)
+                            AppLogger.i("MainActivity", "【服务重启指令】TtsPlaybackService 重置与重新就位指令已下发成功")
+                        } catch (e: Exception) {
+                            AppLogger.e("MainActivity", "【服务重启指令】重置 TtsPlaybackService 失败", e)
+                        }
+
+                        AppLogger.i("MainActivity", "【服务重启指令】步骤 2/3：激活通知层监听重建 (NotificationListenerService)...")
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                            try {
+                                android.service.notification.NotificationListenerService.requestRebind(
+                                    android.content.ComponentName(context, com.example.service.GeminiNotificationListener::class.java)
+                                )
+                                AppLogger.i("MainActivity", "【服务重启指令】通知栏监听器重连关联指令已下发完成")
+                            } catch (e: Exception) {
+                                AppLogger.e("MainActivity", "【服务重启指令】通知监听器重绑定失败", e)
+                            }
+                        } else {
+                            AppLogger.i("MainActivity", "【服务重启指令】当前系统版本低于 Android N，跳过重绑定机制")
+                        }
+
+                        AppLogger.i("MainActivity", "【服务重启指令】步骤 3/3：检查无障碍内核连接状态...")
+                        if (com.example.service.GeminiTextSnifferService.isServiceConnected) {
+                            AppLogger.i("MainActivity", "【服务重启指令】无障碍系统当前状态：[已连接 / 正常拦截中]")
+                        } else {
+                            AppLogger.w("MainActivity", "【服务重启指令】无障碍监测：[未注册/未授权]！如果您前台无法朗读，请至辅助功能系统配置页，手动开关当前无障碍连接！")
+                        }
+                        AppLogger.i("MainActivity", "==========================================================================")
+
+                        // Refresh logs list and toast notification
+                        logs = AppLogger.readLogs(120)
+                        Toast.makeText(context, "所有服务已触发重启，双向拦截诊断就绪", Toast.LENGTH_SHORT).show()
+                    }
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Refresh,
-                    contentDescription = "Refresh logs",
-                    tint = ThemeColors.TextSecondary,
-                    modifier = Modifier.size(16.dp)
+                    contentDescription = "Restart Services",
+                    tint = ThemeColors.OceanicTeal,
+                    modifier = Modifier.size(13.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = "重启服务",
+                    color = ThemeColors.OceanicTeal,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }

@@ -27,9 +27,11 @@ class GeminiTextSnifferService : AccessibilityService() {
         private const val PACKAGE_GOOGLE = "com.google.android.apps.google"
         private const val STREAM_DEBOUNCE_DELAY_MS = 1600L
         private const val MAX_QUEUE_SIZE = 5
+        var isServiceConnected = false
     }
 
     private val mainHandler = Handler(Looper.getMainLooper())
+    private var periodicDetectionRunnable: Runnable? = null
     private val deduplicationQueue = LinkedList<String>()
 
     private var lastCapturedUserText = ""
@@ -41,7 +43,9 @@ class GeminiTextSnifferService : AccessibilityService() {
     }
 
     override fun onServiceConnected() {
+        isServiceConnected = true
         AppLogger.i(TAG, "辅助功能拦截监听器成功绑定并启动")
+        startPeriodicDetection()
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
@@ -231,8 +235,98 @@ class GeminiTextSnifferService : AccessibilityService() {
         mainHandler.removeCallbacks(debounceRunnable)
     }
 
+    override fun onUnbind(intent: Intent?): Boolean {
+        isServiceConnected = false
+        stopPeriodicDetection()
+        return super.onUnbind(intent)
+    }
+
     override fun onDestroy() {
+        isServiceConnected = false
+        stopPeriodicDetection()
         mainHandler.removeCallbacks(debounceRunnable)
         super.onDestroy()
+    }
+
+    private fun startPeriodicDetection() {
+        periodicDetectionRunnable?.let { mainHandler.removeCallbacks(it) }
+        
+        periodicDetectionRunnable = object : Runnable {
+            override fun run() {
+                if (!isServiceConnected) return
+                try {
+                    performActiveDetection()
+                } catch (e: Exception) {
+                    Log.e(TAG, "5秒频率定时检测执行异常", e)
+                }
+                if (isServiceConnected) {
+                    mainHandler.postDelayed(this, 5000L)
+                }
+            }
+        }
+        mainHandler.postDelayed(periodicDetectionRunnable!!, 5000L)
+        AppLogger.i(TAG, "【极速高刷侦测】5秒频率定时检测轮询已启动")
+    }
+
+    private fun stopPeriodicDetection() {
+        periodicDetectionRunnable?.let {
+            mainHandler.removeCallbacks(it)
+            periodicDetectionRunnable = null
+        }
+        AppLogger.i(TAG, "【极速高刷侦测】5秒频率定时检测轮询已停止")
+    }
+
+    private fun performActiveDetection() {
+        val rootNode = rootInActiveWindow
+        if (rootNode == null) {
+            Log.i(TAG, "【探测周期 [5s]】当前处于桌面、锁屏或受安全保护界面（无法获取活跃窗口 rootInActiveWindow 为空）")
+            return
+        }
+        
+        val currentPkg = rootNode.packageName?.toString() ?: ""
+        val isGeminiApp = (currentPkg == PACKAGE_BARD || currentPkg == PACKAGE_GOOGLE)
+        
+        if (isGeminiApp) {
+            val hasTargetNodes = scanControlsPresent(rootNode)
+            if (hasTargetNodes) {
+                AppLogger.i(TAG, "【探测周期 [5s]】检测到前台 Gemini 应用活跃 [$currentPkg]，且对话关键控件就绪 (处于捕获范围)")
+            } else {
+                AppLogger.w(TAG, "【探测周期 [5s]】检测到前台 Gemini 应用活跃 [$currentPkg]，但「尚未找到」聊天气泡或关键元素 (未在对话详情页)")
+            }
+        } else {
+            Log.i(TAG, "【探测周期 [5s]】未检测到前台 Gemini 应用。当前前台活跃包名: '$currentPkg'")
+        }
+        
+        try {
+            rootNode.recycle()
+        } catch (e: Exception) {
+            // Suppress recycle faults
+        }
+    }
+
+    private fun scanControlsPresent(rootNode: AccessibilityNodeInfo): Boolean {
+        var foundControls = false
+        fun search(node: AccessibilityNodeInfo?) {
+            if (node == null || foundControls) return
+            try {
+                val viewId = node.viewIdResourceName ?: ""
+                if (viewId.contains("user_query") || viewId.contains("chat_message_text_user") || 
+                    viewId.contains("query_text") || viewId.contains("response_body") || 
+                    viewId.contains("text_bubble") || viewId.contains("chat_message_text") || 
+                    viewId.contains("card_text")) {
+                    foundControls = true
+                    return
+                }
+                for (i in 0 until node.childCount) {
+                    val child = node.getChild(i)
+                    if (child != null) {
+                        search(child)
+                        try { child.recycle() } catch (re: Exception) {}
+                    }
+                }
+            } catch (e: Exception) {}
+        }
+        search(rootNode)
+        return foundControls
     }
 }

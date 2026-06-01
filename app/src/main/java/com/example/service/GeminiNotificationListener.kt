@@ -15,10 +15,23 @@ class GeminiNotificationListener : NotificationListenerService() {
         AppLogger.i(TAG, "GeminiNotificationListener: Notification Listener Service Created.")
     }
 
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        isServiceConnected = true
+        AppLogger.i(TAG, "通知栏监听服务成功绑定并启动 (NotificationListener Connected)")
+    }
+
+    override fun onListenerDisconnected() {
+        super.onListenerDisconnected()
+        isServiceConnected = false
+        AppLogger.w(TAG, "通知栏监听服务已被系统断开 (NotificationListener Disconnected)")
+    }
+
     companion object {
         private const val TAG = "GeminiNotifListener"
         private const val PACKAGE_BARD = "com.google.android.apps.bard"
         private const val PACKAGE_GOOGLE = "com.google.android.apps.google"
+        var isServiceConnected = false
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {

@@ -71,6 +71,7 @@ class TtsPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener {
 
         setupLocks()
         setupNotificationChannel()
+        startStatusReportingJob()
     }
 
     private fun setupLocks() {
@@ -386,4 +387,50 @@ class TtsPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    private fun startStatusReportingJob() {
+        serviceScope.launch {
+            while (true) {
+                kotlinx.coroutines.delay(5000L)
+                try {
+                    val prefs = getSharedPreferences("secure_credentials", Context.MODE_PRIVATE)
+                    val snifferEnabled = prefs.getBoolean("sniffer_service_enabled", true)
+                    
+                    if (!snifferEnabled) {
+                        Log.i(TAG, "【5s 心跳探测】当前总控开关设定为：[未启用/未拦截态]")
+                    } else {
+                        // Check if GeminiTextSnifferService is currently connected
+                        val snifferConnected = checkSnifferServiceRunning()
+                        if (!snifferConnected) {
+                            Log.w(TAG, "【5s 心跳探测警告】系统总拦截开关[已开启]，但辅助功能「无障碍服务」当前处于 [断开/未授权] 状态！无法进行屏幕嗅探！")
+                        }
+                        
+                        // Check notification listener service connected status
+                        val nlsConnected = checkNlsServiceRunning()
+                        if (!nlsConnected) {
+                            Log.w(TAG, "【5s 心跳探测警告】通知栏监听服务 (NotificationListener) 当前处于 [未运行/未激活态]，通知补偿机制当前失效。")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "TtsPlaybackService periodic status report task error", e)
+                }
+            }
+        }
+    }
+
+    private fun checkSnifferServiceRunning(): Boolean {
+        return try {
+            GeminiTextSnifferService.isServiceConnected
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    private fun checkNlsServiceRunning(): Boolean {
+        return try {
+            GeminiNotificationListener.isServiceConnected
+        } catch (e: Exception) {
+            false
+        }
+    }
 }
