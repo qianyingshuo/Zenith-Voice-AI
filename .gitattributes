@@ -1,0 +1,17 @@
+# Ensure line endings are handled consistently
+* text=auto
+
+# Declare binary files to completely prevent line-ending corruption (very important for gradle-wrapper.jar)
+*.jar binary
+*.png binary
+*.webp binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.aar binary
+*.apk binary
+*.so binary
+
+# Force Unix line endings for shell scripts and gradlew wrapper script
+*.sh text eol=lf
+gradlew text eol=lf
