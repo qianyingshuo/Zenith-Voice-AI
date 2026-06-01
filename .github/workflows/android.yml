@@ -24,22 +24,29 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
       with:
-        gradle-version: 8.11.1
+        gradle-version: 9.3.1
         validate-wrappers: false
 
     - name: Decode Debug Keystore
       run: |
         if [ -f debug.keystore.base64 ]; then
-          tr -d '\r\n ' < debug.keystore.base64 | base64 --decode > debug.keystore 2>/dev/null || \
-          tr -d '\r\n ' < debug.keystore.base64 | base64 -d > debug.keystore 2>/dev/null || \
-          openssl base64 -d -A -in debug.keystore.base64 -out debug.keystore 2>/dev/null || \
-          python3 -c "import base64; open('debug.keystore', 'wb').write(base64.b64decode(open('debug.keystore.base64', 'r').read().strip()))"
+          echo "Decoding debug.keystore.base64..."
+          tr -d '\r\n ' < debug.keystore.base64 | base64 -d > debug.keystore || \
+          tr -d '\r\n ' < debug.keystore.base64 | base64 --decode > debug.keystore || \
+          openssl base64 -d -A -in debug.keystore.base64 -out debug.keystore || \
+          python3 -c "import base64; data=open('debug.keystore.base64','r').read().strip().replace('\n','').replace('\r','').replace(' ',''); open('debug.keystore', 'wb').write(base64.b64decode(data))"
           
-          mkdir -p app
-          cp debug.keystore app/debug.keystore
-          echo "Debug keystore decoded successfully."
+          if [ -s debug.keystore ]; then
+            echo "Success: Decoded debug.keystore size is $(wc -c < debug.keystore) bytes"
+            mkdir -p app
+            cp -f debug.keystore app/debug.keystore
+          else
+            echo "Error: decoded debug.keystore is empty or failed to decode."
+            exit 1
+          fi
         else
-          echo "Warning: debug.keystore.base64 not found."
+          echo "Error: debug.keystore.base64 not found."
+          exit 1
         fi
 
     - name: Generate .env File
@@ -58,5 +65,5 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: app-debug
-        path: app/build/outputs/apk/debug/app-debug.apk
+        path: app/build/outputs/apk/debug/*.apk
         retention-days: 7

@@ -5,7 +5,18 @@ import java.io.File
 interface TtsEngine {
     enum class EngineType {
         AZURE,
-        GEMINI
+        GEMINI;
+
+        companion object {
+            fun fromStringSafely(value: String?): EngineType {
+                if (value == null) return AZURE
+                return try {
+                    valueOf(value.uppercase().trim())
+                } catch (e: Exception) {
+                    AZURE
+                }
+            }
+        }
     }
 
     suspend fun synthesizeAndGetFile(

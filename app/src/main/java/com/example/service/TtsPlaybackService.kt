@@ -44,6 +44,7 @@ class TtsPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener {
     private val okHttpClient = OkHttpClient()
     private var mediaPlayer: MediaPlayer? = null
     private var focusRequest: AudioFocusRequest? = null
+    private var mediaSession: android.media.session.MediaSession? = null
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
@@ -59,6 +60,14 @@ class TtsPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener {
         
         val database = AppDatabase.getDatabase(applicationContext)
         repository = ChatRepository(applicationContext, database.chatDao())
+
+        try {
+            mediaSession = android.media.session.MediaSession(this, "GeminiTtsBridgeSession").apply {
+                isActive = true
+            }
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "Failed to initialize MediaSession", e)
+        }
 
         setupLocks()
         setupNotificationChannel()
@@ -82,27 +91,26 @@ class TtsPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action
-        val startAsForeground = intent?.getBooleanExtra(EXTRA_START_AS_FOREGROUND, false) == true
-        if (startAsForeground) {
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    startForeground(
-                        NOTIFICATION_ID,
-                        buildOngoingNotification("无障碍语音桥接器已启动，等待接收聊天内容"),
-                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
-                    )
-                } else {
-                    @Suppress("DEPRECATION")
-                    startForeground(NOTIFICATION_ID, buildOngoingNotification("无障碍语音桥接器已启动，等待接收聊天内容"))
-                }
-            } catch (e: Exception) {
-                AppLogger.e(TAG, "Failed to start foreground natively inside startCommand", e)
+        
+        // Always promote immediately to foreground state to satisfy background launch rules
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    NOTIFICATION_ID,
+                    buildOngoingNotification("无障碍语音桥接器已启动，等待接收聊天内容"),
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                startForeground(NOTIFICATION_ID, buildOngoingNotification("无障碍语音桥接器已启动，等待接收聊天内容"))
             }
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "Failed to start foreground natively inside startCommand", e)
         }
 
         if (action == ACTION_PLAY_SPEECH) {
-            val text = intent.getStringExtra(EXTRA_SPEECH_TEXT) ?: ""
-            val isUser = intent.getBooleanExtra(EXTRA_IS_USER, false)
+            val text = intent?.getStringExtra(EXTRA_SPEECH_TEXT) ?: ""
+            val isUser = intent?.getBooleanExtra(EXTRA_IS_USER, false) == true
             if (text.isNotEmpty()) {
                 processAndPlay(text, isUser)
             }
@@ -118,8 +126,8 @@ class TtsPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener {
             
             // Get user credentials from shared preferences
             val prefs = getSharedPreferences("secure_credentials", Context.MODE_PRIVATE)
-            val engineTypeStr = prefs.getString("engine_type", TtsEngine.EngineType.AZURE.name) ?: TtsEngine.EngineType.AZURE.name
-            val engineType = TtsEngine.EngineType.valueOf(engineTypeStr)
+            val engineTypeStr = prefs.getString("engine_type", TtsEngine.EngineType.AZURE.name)
+            val engineType = TtsEngine.EngineType.fromStringSafely(engineTypeStr)
             
             val azureKey = prefs.getString("api_key_azure", "") ?: ""
             val azureRegion = prefs.getString("region_azure", "") ?: ""
@@ -367,6 +375,12 @@ class TtsPlaybackService : Service(), AudioManager.OnAudioFocusChangeListener {
 
     override fun onDestroy() {
         stopPlaying()
+        try {
+            mediaSession?.isActive = false
+            mediaSession?.release()
+        } catch (e: Exception) {
+            AppLogger.e(TAG, "Failed to release MediaSession", e)
+        }
         serviceJob.cancel()
         super.onDestroy()
     }

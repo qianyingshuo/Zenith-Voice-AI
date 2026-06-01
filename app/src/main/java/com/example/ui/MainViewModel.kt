@@ -44,7 +44,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // --- Configuration States ---
-    private val _engineType = MutableStateFlow(TtsEngine.EngineType.valueOf(prefs.getString("engine_type", TtsEngine.EngineType.AZURE.name) ?: TtsEngine.EngineType.AZURE.name))
+    private val _engineType = MutableStateFlow(TtsEngine.EngineType.fromStringSafely(prefs.getString("engine_type", TtsEngine.EngineType.AZURE.name)))
     val engineType = _engineType.asStateFlow()
 
     private val _apiKeyAzure = MutableStateFlow(prefs.getString("api_key_azure", "") ?: "")

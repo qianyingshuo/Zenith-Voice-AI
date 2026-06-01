@@ -72,6 +72,14 @@ class MainActivity : ComponentActivity() {
         AppLogger.i("MainActivity", "Application Main Activity launched and started.")
         enableEdgeToEdge()
 
+        // Request POST_NOTIFICATIONS on Android 13 (Tiramisu) and above
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val hasNotificationPermission = checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (!hasNotificationPermission) {
+                requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 101)
+            }
+        }
+
         // Handle OAuth callback token from deep link safely
         intent?.data?.let { uri ->
             try {
@@ -502,9 +510,9 @@ fun SnifferControlPanel(viewModel: MainViewModel) {
                                 putExtra(TtsPlaybackService.EXTRA_IS_USER, false)
                             }
                             try {
-                                context.startService(triggerIntent)
+                                androidx.core.content.ContextCompat.startForegroundService(context, triggerIntent)
                             } catch (e: Exception) {
-                                AppLogger.e("MainActivity", "Failed context.startService", e)
+                                AppLogger.e("MainActivity", "Failed context.startForegroundService", e)
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = ThemeColors.SurfaceCard),
@@ -660,9 +668,9 @@ fun ChatMessageCard(msg: ChatMessage) {
                                 putExtra(TtsPlaybackService.EXTRA_IS_USER, false)
                             }
                             try {
-                                context.startService(playerIntent)
+                                androidx.core.content.ContextCompat.startForegroundService(context, playerIntent)
                             } catch (e: Exception) {
-                                AppLogger.e("MainActivity", "Failed context.startService for player", e)
+                                AppLogger.e("MainActivity", "Failed context.startForegroundService for player", e)
                             }
                         }
                         .padding(horizontal = 10.dp, vertical = 6.dp),
